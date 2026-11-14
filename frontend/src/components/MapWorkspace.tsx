@@ -9,8 +9,13 @@ import {
   RotateCcw,
   Plus,
   Minus,
+  Mountain,
 } from 'lucide-react';
 import { useResQ } from '../context/ResQContext';
+
+const MAPTILER_KEY = (import.meta as any).env?.VITE_MAPTILER_KEY || 'w3Poa73PAndzWCcg9bGA';
+
+type MapStyle = 'dark' | 'sat' | 'topo' | 'street';
 
 export const MapWorkspace: React.FC = () => {
   const { latestGps, gpsTrail, clearLocalHistory } = useResQ();
@@ -27,10 +32,28 @@ export const MapWorkspace: React.FC = () => {
   const [showVictimMarker, setShowVictimMarker] = useState<boolean>(true);
   const [showTrail, setShowTrail] = useState<boolean>(true);
   const [showAccuracy, setShowAccuracy] = useState<boolean>(true);
-  const [mapStyle, setMapStyle] = useState<'dark' | 'sat' | 'street'>('dark');
+  const [mapStyle, setMapStyle] = useState<MapStyle>('dark');
 
   // Fix Freshness State
   const isLive = latestGps && Date.now() / 1000 - latestGps.timestamp < 30;
+
+  const getTileLayer = (style: MapStyle): L.TileLayer => {
+    let url = `https://api.maptiler.com/maps/dataviz-dark/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`;
+    if (style === 'sat') {
+      url = `https://api.maptiler.com/maps/hybrid/256/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`;
+    } else if (style === 'topo') {
+      url = `https://api.maptiler.com/maps/outdoor-v2/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`;
+    } else if (style === 'street') {
+      url = `https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`;
+    }
+
+    return L.tileLayer(url, {
+      attribution:
+        '&copy; <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
+      maxZoom: 20,
+      crossOrigin: true,
+    });
+  };
 
   // Initialize Map
   useEffect(() => {
@@ -46,20 +69,15 @@ export const MapWorkspace: React.FC = () => {
       attributionControl: true,
     });
 
-    // Dark Basemap by default (CartoDB Dark Matter)
-    const darkTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
-      subdomains: 'abcd',
-      maxZoom: 19,
-    }).addTo(map);
-
-    tileLayerRef.current = darkTile;
+    // Initial MapTiler Dark Tile
+    const initialTile = getTileLayer('dark').addTo(map);
+    tileLayerRef.current = initialTile;
 
     // Polyline for Movement Trail
     const polyline = L.polyline([], {
       color: '#48D8D0',
       weight: 2.5,
-      opacity: 0.75,
+      opacity: 0.85,
       dashArray: '3, 6',
     }).addTo(map);
 
@@ -68,7 +86,7 @@ export const MapWorkspace: React.FC = () => {
       radius: 20,
       color: '#1D8F82',
       fillColor: '#19A88F',
-      fillOpacity: 0.1,
+      fillOpacity: 0.12,
       weight: 1,
     }).addTo(map);
 
@@ -82,7 +100,7 @@ export const MapWorkspace: React.FC = () => {
     };
   }, []);
 
-  // Update Map Layer Style
+  // Update Map Layer Style when mapStyle changes
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -91,18 +109,8 @@ export const MapWorkspace: React.FC = () => {
       map.removeLayer(tileLayerRef.current);
     }
 
-    let url = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-    let attr = '&copy; OpenStreetMap &copy; CARTO';
-
-    if (mapStyle === 'sat') {
-      url = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-      attr = '&copy; Esri, Maxar, Earthstar Geographics';
-    } else if (mapStyle === 'street') {
-      url = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-      attr = '&copy; OpenStreetMap contributors';
-    }
-
-    tileLayerRef.current = L.tileLayer(url, { attribution: attr, maxZoom: 19 }).addTo(map);
+    const newLayer = getTileLayer(mapStyle).addTo(map);
+    tileLayerRef.current = newLayer;
   }, [mapStyle]);
 
   // Update Victim Marker and Accuracy Circle when GPS coordinates change
@@ -289,9 +297,9 @@ export const MapWorkspace: React.FC = () => {
 
       {/* Floating Map Controls (Bottom Left, Overglass Segmented Switcher) */}
       <div className="absolute bottom-3 left-3 z-20 flex items-center gap-1.5 font-mono text-[10px] select-none">
-        {/* Style Switcher */}
+        {/* Style Switcher with 4 MapTiler Modes */}
         <div className="bg-[#0E151A]/95 border border-[#26343A] rounded p-0.5 flex items-center gap-0.5 backdrop-blur-md shadow-lg">
-          {(['dark', 'sat', 'street'] as const).map((style) => (
+          {(['dark', 'sat', 'topo', 'street'] as const).map((style) => (
             <button
               key={style}
               onClick={() => setMapStyle(style)}
@@ -301,7 +309,7 @@ export const MapWorkspace: React.FC = () => {
                   : 'text-[#87949A] hover:text-[#E5ECF0]'
               }`}
             >
-              {style === 'dark' ? 'DARK' : style === 'sat' ? 'SAT' : 'MAP'}
+              {style === 'dark' ? 'DARK' : style === 'sat' ? 'SAT' : style === 'topo' ? 'TOPO' : 'MAP'}
             </button>
           ))}
         </div>
