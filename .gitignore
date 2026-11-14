@@ -1,0 +1,26 @@
+# Compiled firmware & binary artifacts
+*.bin
+*.elf
+*.hex
+*.o
+*.a
+*.d
+*.map
+
+# Editor and IDE directories
+.vscode/
+.idea/
+*.swp
+*~
+*.bak
+
+# Arduino / PlatformIO build artifacts
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
