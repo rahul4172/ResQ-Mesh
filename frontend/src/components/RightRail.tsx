@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Crosshair,
   Satellite,
@@ -8,12 +8,15 @@ import {
   Radio,
   Cpu,
   Volume2,
+  VolumeX,
+  Mic,
   Copy,
   Check,
   ExternalLink,
   Zap,
 } from 'lucide-react';
 import { useResQ } from '../context/ResQContext';
+import { audioMonitor } from '../services/audioMonitor';
 
 export const RightRail: React.FC = () => {
   const {
@@ -25,6 +28,9 @@ export const RightRail: React.FC = () => {
   } = useResQ();
 
   const [copied, setCopied] = useState<boolean>(false);
+  const [isMonitoring, setIsMonitoring] = useState<boolean>(audioMonitor.getIsMonitoring());
+  const [isMicActive, setIsMicActive] = useState<boolean>(audioMonitor.getIsMicActive());
+  const [volume, setVolume] = useState<number>(audioMonitor.getVolume());
 
   // Fix Freshness Evaluation
   const isFixLive = latestGps && Date.now() / 1000 - latestGps.timestamp < 30;
@@ -42,6 +48,29 @@ export const RightRail: React.FC = () => {
   const currentPeak = latestAudio?.peak_level ?? latestStats?.decoded_peak_level ?? 0;
   const peakPercent = Math.min(100, Math.round((currentPeak / 25000) * 100));
 
+  const isAudioActive = latestAudio?.state === 'STREAMING';
+
+  // Drive Web Audio API real-time acoustic synthesizer when telemetry updates
+  useEffect(() => {
+    audioMonitor.updateAudioTelemetry(isAudioActive, currentPeak);
+  }, [isAudioActive, currentPeak]);
+
+  const handleToggleMonitor = () => {
+    const active = audioMonitor.toggleMonitoring();
+    setIsMonitoring(active);
+  };
+
+  const handleToggleMic = async () => {
+    const active = await audioMonitor.toggleMicPassThrough();
+    setIsMicActive(active);
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = parseFloat(e.target.value);
+    setVolume(v);
+    audioMonitor.setVolume(v);
+  };
+
   // Voice loss indicator
   const voiceLoss = latestStats?.packet_loss_pct ?? 0;
   const lossColor =
@@ -55,12 +84,10 @@ export const RightRail: React.FC = () => {
     ? latestStats.voice_packets_received + latestStats.gps_packets_received
     : null;
 
-  const isAudioActive = latestAudio?.state === 'STREAMING';
-
   return (
     <aside className="w-[290px] flex-shrink-0 bg-[#0E151A] border-l border-[#26343A] flex flex-col h-full overflow-y-auto overflow-x-hidden font-mono text-xs select-none z-10 custom-scrollbar">
       {/* MODULE 1: VICTIM BEACON / TARGET HUD */}
-      <div className="p-2.5 border-b border-[#26343A] bg-[#10161B] space-y-2">
+      <div className="p-2.5 border-b border-[#26343A] bg-[#10161B] space-y-2 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-1.5">
             <Crosshair className="w-3.5 h-3.5 text-[#48D8D0]" />
@@ -206,8 +233,8 @@ export const RightRail: React.FC = () => {
         </div>
       </div>
 
-      {/* MODULE 2: VOICE COMMS & CODEC2 DECOUPLING */}
-      <div className="p-2.5 border-b border-[#26343A] bg-[#10161B] space-y-1.5">
+      {/* MODULE 2: VOICE COMMS & BROWSER LIVE AUDIO MONITOR */}
+      <div className="p-2.5 border-b border-[#26343A] bg-[#10161B] space-y-2 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-1.5">
             <Volume2 className="w-3.5 h-3.5 text-[#48D8D0]" />
@@ -221,10 +248,64 @@ export const RightRail: React.FC = () => {
           </span>
         </div>
 
-        {/* Stream Status and Peak Indicator */}
+        {/* PRIMARY ACTION: BROWSER AUDIO MONITOR TOGGLE */}
+        <button
+          onClick={handleToggleMonitor}
+          className={`w-full py-1.5 px-2 rounded font-bold transition-all flex items-center justify-center space-x-1.5 text-[10px] ${
+            isMonitoring
+              ? 'bg-[#35C98A]/20 text-[#35C98A] border border-[#35C98A]/50 shadow-sm'
+              : 'bg-[#48D8D0]/15 text-[#48D8D0] border border-[#48D8D0]/40 hover:bg-[#48D8D0]/25'
+          }`}
+        >
+          {isMonitoring ? (
+            <>
+              <Volume2 className="w-3.5 h-3.5 text-[#35C98A] animate-pulse" />
+              <span>LIVE PC AUDIO MONITOR ACTIVE</span>
+            </>
+          ) : (
+            <>
+              <VolumeX className="w-3.5 h-3.5 text-[#87949A]" />
+              <span>CLICK TO ENABLE PC AUDIO MONITOR</span>
+            </>
+          )}
+        </button>
+
+        {/* Volume Slider & Line-In Mic Toggle */}
         <div className="bg-[#080B0F] border border-[#26343A] p-2 rounded space-y-1.5">
-          <div className="flex items-center justify-between text-[10px]">
-            <span className="text-[#58666B]">STREAM STATUS:</span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center space-x-1.5 flex-1">
+              <span className="text-[8px] text-[#58666B]">VOL:</span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={volume}
+                onChange={handleVolumeChange}
+                className="w-full h-1 bg-[#10161B] rounded appearance-none cursor-pointer accent-[#48D8D0]"
+              />
+              <span className="text-[9px] font-bold text-[#E5ECF0] w-6 text-right">
+                {Math.round(volume * 100)}%
+              </span>
+            </div>
+
+            <button
+              onClick={handleToggleMic}
+              className={`px-1.5 py-0.5 rounded border text-[8px] font-semibold transition-colors flex items-center space-x-1 shrink-0 ${
+                isMicActive
+                  ? 'bg-[#4B91E8]/20 text-[#4B91E8] border-[#4B91E8]/50'
+                  : 'bg-[#151D23] text-[#87949A] border-[#26343A] hover:text-[#E5ECF0]'
+              }`}
+              title="Listen to physical ESP32 speaker via PC 3.5mm Line-In or Mic"
+            >
+              <Mic className="w-2.5 h-2.5" />
+              <span>{isMicActive ? 'LINE-IN ON' : 'LINE-IN MIC'}</span>
+            </button>
+          </div>
+
+          {/* Stream Status and Peak Indicator */}
+          <div className="flex items-center justify-between text-[10px] pt-1 border-t border-[#1C262C]">
+            <span className="text-[#58666B]">CARRIER STATE:</span>
             <span className="flex items-center space-x-1.5">
               <span
                 className={`w-1.5 h-1.5 rounded-full ${
@@ -260,33 +341,20 @@ export const RightRail: React.FC = () => {
               />
             </div>
           </div>
-
-          {/* Decode Latency Gauge */}
-          <div className="flex items-center justify-between text-[9px] pt-1 border-t border-[#1C262C]">
-            <span className="text-[#58666B]">DECODE LATENCY:</span>
-            <span className="text-[#E5ECF0] font-semibold">
-              {latestAudio?.slowest_decode_ms
-                ? `${latestAudio.slowest_decode_ms} ms`
-                : latestStats?.slowest_decode_ms
-                ? `${latestStats.slowest_decode_ms} ms`
-                : '3.8 ms'}{' '}
-              / 40ms
-            </span>
-          </div>
         </div>
 
         {/* Hardware Architecture Disclosure Notice */}
         <div className="p-1.5 rounded bg-[#080B0F] border border-[#19A88F]/30 text-[#87949A] text-[9px] leading-relaxed flex items-start space-x-1.5">
           <Zap className="w-3 h-3 text-[#19A88F] flex-shrink-0 mt-0.5" />
           <div>
-            <span className="text-[#19A88F] font-semibold">MAX98357A I2S: </span>
-            Voice synthesized on ESP32 & routed to physical speaker (GPIO 25, 26, 27). USB serial exposes diagnostics only.
+            <span className="text-[#19A88F] font-semibold">MAX98357A HW Speaker: </span>
+            Voice is synthesized directly on the ESP32 to its physical speaker (GPIO 25/26/27). Enable the PC Monitor button above to hear audio through laptop speakers.
           </div>
         </div>
       </div>
 
       {/* MODULE 3: PACKET STATISTICS & RADIO METRICS */}
-      <div className="p-2.5 border-b border-[#26343A] bg-[#10161B] space-y-1.5">
+      <div className="p-2.5 border-b border-[#26343A] bg-[#10161B] space-y-1.5 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-1.5">
             <Radio className="w-3.5 h-3.5 text-[#48D8D0]" />
@@ -352,7 +420,7 @@ export const RightRail: React.FC = () => {
       </div>
 
       {/* MODULE 4: RECEIVER & SUBSYSTEM HEALTH */}
-      <div className="p-2.5 bg-[#10161B] space-y-1.5 flex-1">
+      <div className="p-2.5 bg-[#10161B] space-y-1.5 flex-1 min-h-[140px]">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-1.5">
             <Cpu className="w-3.5 h-3.5 text-[#48D8D0]" />
