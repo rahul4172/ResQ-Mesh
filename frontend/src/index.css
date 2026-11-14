@@ -13,19 +13,23 @@
 }
 
 /* Custom dark scrollbar */
-::-webkit-scrollbar {
+::-webkit-scrollbar,
+.custom-scrollbar::-webkit-scrollbar {
   width: 4px;
   height: 4px;
 }
-::-webkit-scrollbar-track {
+::-webkit-scrollbar-track,
+.custom-scrollbar::-webkit-scrollbar-track {
   background: #080B0F;
 }
-::-webkit-scrollbar-thumb {
+::-webkit-scrollbar-thumb,
+.custom-scrollbar::-webkit-scrollbar-thumb {
   background: #26343A;
   border-radius: 2px;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: #1D8F82;
+::-webkit-scrollbar-thumb:hover,
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #48D8D0;
 }
 
 /* Tactical HUD corner bracket accents */
@@ -62,6 +66,24 @@
 .leaflet-container {
   background-color: #080B0F !important;
   font-family: inherit;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(8, 11, 15, 0.75) !important;
+  color: #58666B !important;
+  font-size: 9px !important;
+  font-family: monospace !important;
+  border: 1px solid rgba(38, 52, 58, 0.5) !important;
+  border-radius: 3px !important;
+  padding: 1px 4px !important;
+  margin: 4px 6px !important;
+}
+
+.leaflet-control-attribution a {
+  color: #87949A !important;
+  text-decoration: none !important;
 }
 
 .dark-tiles {
@@ -95,4 +117,19 @@
   border: 1px dashed #19A88F;
   opacity: 0.5;
   animation: radar 2.5s ease-out infinite 0.8s;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.15s ease-out forwards;
 }

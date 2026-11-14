@@ -4,14 +4,11 @@ import {
   Layers,
   Crosshair,
   Maximize2,
-  ExternalLink,
-  Satellite,
-  Compass,
-  Gauge,
-  MapPin,
   ChevronDown,
   ChevronUp,
   RotateCcw,
+  Plus,
+  Minus,
 } from 'lucide-react';
 import { useResQ } from '../context/ResQContext';
 
@@ -26,7 +23,7 @@ export const MapWorkspace: React.FC = () => {
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
   // Layer Toggles (Floating Panel)
-  const [layersOpen, setLayersOpen] = useState<boolean>(true);
+  const [layersOpen, setLayersOpen] = useState<boolean>(false);
   const [showVictimMarker, setShowVictimMarker] = useState<boolean>(true);
   const [showTrail, setShowTrail] = useState<boolean>(true);
   const [showAccuracy, setShowAccuracy] = useState<boolean>(true);
@@ -34,7 +31,6 @@ export const MapWorkspace: React.FC = () => {
 
   // Fix Freshness State
   const isLive = latestGps && Date.now() / 1000 - latestGps.timestamp < 30;
-  const fixAgeSec = latestGps ? Math.max(0, Math.floor(Date.now() / 1000 - latestGps.timestamp)) : null;
 
   // Initialize Map
   useEffect(() => {
@@ -109,156 +105,181 @@ export const MapWorkspace: React.FC = () => {
     tileLayerRef.current = L.tileLayer(url, { attribution: attr, maxZoom: 19 }).addTo(map);
   }, [mapStyle]);
 
-  // Update Victim Marker and Trail on GPS telemetry updates
+  // Update Victim Marker and Accuracy Circle when GPS coordinates change
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!map || !latestGps) return;
 
-    // Update trail polyline
-    if (polylineRef.current) {
-      if (showTrail && gpsTrail.length > 0) {
-        const latLngs = gpsTrail.map((g) => [g.latitude, g.longitude] as [number, number]);
-        polylineRef.current.setLatLngs(latLngs);
-      } else {
-        polylineRef.current.setLatLngs([]);
-      }
-    }
+    const latLng: [number, number] = [latestGps.latitude, latestGps.longitude];
 
-    if (latestGps && showVictimMarker) {
-      const pos: [number, number] = [latestGps.latitude, latestGps.longitude];
-
-      // Update Accuracy Circle (radius approximated from HDOP * 5 meters)
-      if (accuracyCircleRef.current) {
-        if (showAccuracy) {
-          const radiusM = Math.max(10, (latestGps.hdop || 1.5) * 6);
-          accuracyCircleRef.current.setLatLng(pos);
-          accuracyCircleRef.current.setRadius(radiusM);
-          accuracyCircleRef.current.setStyle({
-            color: isLive ? '#1D8F82' : '#E6B84D',
-            fillColor: isLive ? '#19A88F' : '#E6B84D',
-          });
-        } else {
-          accuracyCircleRef.current.setRadius(0);
-        }
-      }
-
-      // Tactical Custom Radar Beacon DivIcon
-      const beaconIcon = L.divIcon({
-        className: 'custom-tactical-beacon',
+    if (!markerRef.current) {
+      // Create custom pulsing radar icon
+      const customIcon = L.divIcon({
+        className: 'custom-beacon-marker',
         html: `
-          <div class="relative w-8 h-8 flex items-center justify-center pointer-events-none">
-            ${isLive ? '<div class="absolute w-8 h-8 rounded-full border border-accent-cyan animate-ping opacity-60"></div>' : ''}
-            <div class="w-3.5 h-3.5 rounded-full ${isLive ? 'bg-accent-cyan border border-white' : 'bg-status-warning border border-black'} shadow-lg z-20"></div>
-            ${latestGps.course_deg ? `<div class="absolute w-6 h-6 border-t-2 border-accent-teal rounded-full" style="transform: rotate(${latestGps.course_deg}deg);"></div>` : ''}
+          <div class="relative flex items-center justify-center w-8 h-8 pointer-events-none">
+            <div class="absolute w-8 h-8 rounded-full ${isLive ? 'bg-[#48D8D0]/30 animate-ping' : 'bg-[#E6B84D]/30'}"></div>
+            <div class="absolute w-5 h-5 rounded-full ${isLive ? 'bg-[#48D8D0]/50' : 'bg-[#E6B84D]/50'}"></div>
+            <div class="w-3.5 h-3.5 rounded-full ${isLive ? 'bg-[#48D8D0] border-2 border-white' : 'bg-[#E6B84D] border-2 border-black'} shadow-lg z-20"></div>
           </div>
         `,
         iconSize: [32, 32],
         iconAnchor: [16, 16],
       });
 
-      if (!markerRef.current) {
-        const marker = L.marker(pos, { icon: beaconIcon }).addTo(map);
-        marker.bindPopup(`
-          <div style="font-family: monospace; font-size: 11px; color: #080B0F; padding: 2px;">
-            <strong style="color: #19A88F;">RESQ-MESH VICTIM BEACON</strong><br/>
-            Lat: ${latestGps.latitude.toFixed(6)}<br/>
-            Lon: ${latestGps.longitude.toFixed(6)}<br/>
-            Fix: ${isLive ? 'LIVE UPDATE' : `STALE (${fixAgeSec}s)`}<br/>
-            Sats: ${latestGps.satellites} | Speed: ${latestGps.speed_kmh} km/h<br/>
-            UTC: ${latestGps.utc_time} | RSSI: ${latestGps.rssi_dbm} dBm
-          </div>
-        `);
-        markerRef.current = marker;
-      } else {
-        markerRef.current.setLatLng(pos);
-        markerRef.current.setIcon(beaconIcon);
-      }
-    } else if (markerRef.current && !showVictimMarker) {
-      markerRef.current.remove();
-      markerRef.current = null;
-    }
-  }, [latestGps, gpsTrail, isLive, showVictimMarker, showTrail, showAccuracy, fixAgeSec]);
+      const marker = L.marker(latLng, { icon: customIcon }).addTo(map);
+      markerRef.current = marker;
 
-  const recenterOnVictim = () => {
-    if (mapInstanceRef.current && latestGps) {
-      mapInstanceRef.current.setView([latestGps.latitude, latestGps.longitude], 16, { animate: true });
+      // Pan map smoothly to the initial GPS point
+      map.panTo(latLng);
+    } else {
+      markerRef.current.setLatLng(latLng);
+
+      // Update pulsing radar icon appearance based on freshness
+      const customIcon = L.divIcon({
+        className: 'custom-beacon-marker',
+        html: `
+          <div class="relative flex items-center justify-center w-8 h-8 pointer-events-none">
+            <div class="absolute w-8 h-8 rounded-full ${isLive ? 'bg-[#48D8D0]/30 animate-ping' : 'bg-[#E6B84D]/30'}"></div>
+            <div class="absolute w-5 h-5 rounded-full ${isLive ? 'bg-[#48D8D0]/50' : 'bg-[#E6B84D]/50'}"></div>
+            <div class="w-3.5 h-3.5 rounded-full ${isLive ? 'bg-[#48D8D0] border-2 border-white' : 'bg-[#E6B84D] border-2 border-black'} shadow-lg z-20"></div>
+          </div>
+        `,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+      });
+      markerRef.current.setIcon(customIcon);
     }
+
+    // Update Accuracy Radius (HDOP * nominal 5m)
+    if (accuracyCircleRef.current) {
+      const radius = Math.max(10, (latestGps.hdop || 1.5) * 5);
+      accuracyCircleRef.current.setLatLng(latLng);
+      accuracyCircleRef.current.setRadius(radius);
+    }
+  }, [latestGps, isLive]);
+
+  // Update Breadcrumb Polyline Trail
+  useEffect(() => {
+    if (!polylineRef.current) return;
+    if (showTrail && gpsTrail.length > 1) {
+      const latLngs: [number, number][] = gpsTrail.map((p) => [p.latitude, p.longitude]);
+      polylineRef.current.setLatLngs(latLngs);
+    } else {
+      polylineRef.current.setLatLngs([]);
+    }
+  }, [gpsTrail, showTrail]);
+
+  // Handle Layer Visibility Toggles
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (markerRef.current) {
+      if (showVictimMarker && !map.hasLayer(markerRef.current)) {
+        markerRef.current.addTo(map);
+      } else if (!showVictimMarker && map.hasLayer(markerRef.current)) {
+        map.removeLayer(markerRef.current);
+      }
+    }
+
+    if (accuracyCircleRef.current) {
+      if (showAccuracy && !map.hasLayer(accuracyCircleRef.current)) {
+        accuracyCircleRef.current.addTo(map);
+      } else if (!showAccuracy && map.hasLayer(accuracyCircleRef.current)) {
+        map.removeLayer(accuracyCircleRef.current);
+      }
+    }
+  }, [showVictimMarker, showAccuracy]);
+
+  // Map Controls Helpers
+  const handleRecenter = () => {
+    if (!mapInstanceRef.current || !latestGps) return;
+    mapInstanceRef.current.panTo([latestGps.latitude, latestGps.longitude]);
   };
 
-  const fitToTrail = () => {
-    if (mapInstanceRef.current && gpsTrail.length > 0) {
-      const bounds = L.latLngBounds(gpsTrail.map((g) => [g.latitude, g.longitude]));
-      mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50], animate: true });
-    }
+  const handleFitTrail = () => {
+    if (!mapInstanceRef.current || gpsTrail.length === 0) return;
+    const bounds = L.latLngBounds(gpsTrail.map((p) => [p.latitude, p.longitude]));
+    mapInstanceRef.current.fitBounds(bounds, { padding: [40, 40] });
+  };
+
+  const handleZoomIn = () => {
+    mapInstanceRef.current?.zoomIn();
+  };
+
+  const handleZoomOut = () => {
+    mapInstanceRef.current?.zoomOut();
   };
 
   return (
-    <div className="flex-1 relative h-[calc(100vh-3.5rem-1.75rem)] bg-bg-app overflow-hidden">
+    <div className="w-full h-full relative bg-[#080B0F] overflow-hidden isolate select-none">
       {/* Central Leaflet Map Container */}
       <div ref={mapContainerRef} className="w-full h-full z-0" />
 
-      {/* Floating Layers Panel (Upper Left, inspired by Overglass) */}
-      <div className="absolute top-4 left-4 z-[400] w-64 bg-bg-panel/95 border border-border-subtle rounded shadow-2xl backdrop-blur-md select-none font-mono text-xs">
+      {/* Floating Tactical Layers Panel (Upper Left, Compact, Overglass Style) */}
+      <div className="absolute top-3 left-3 z-20 w-52 bg-[#0E151A]/95 border border-[#26343A] rounded shadow-xl backdrop-blur-md select-none font-mono text-xs">
         <div
           onClick={() => setLayersOpen(!layersOpen)}
-          className="p-2.5 bg-bg-panel-raised border-b border-border-subtle flex items-center justify-between cursor-pointer hover:text-accent-cyan transition-colors"
+          className="p-2 bg-[#10161B] border-b border-[#26343A] flex items-center justify-between cursor-pointer hover:text-[#48D8D0] transition-colors"
         >
-          <span className="flex items-center gap-2 text-2xs uppercase tracking-tactical font-bold text-tactext-primary">
-            <Layers className="w-3.5 h-3.5 text-accent-cyan" />
+          <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-[#E5ECF0]">
+            <Layers className="w-3.5 h-3.5 text-[#48D8D0]" />
             TACTICAL LAYERS
           </span>
-          {layersOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          {layersOpen ? <ChevronUp className="w-3.5 h-3.5 text-[#87949A]" /> : <ChevronDown className="w-3.5 h-3.5 text-[#87949A]" />}
         </div>
 
         {layersOpen && (
-          <div className="p-3 space-y-2.5 text-2xs">
-            <label className="flex items-center justify-between text-tactext-secondary hover:text-tactext-primary cursor-pointer">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-accent-cyan" />
-                Victim Beacon [0xA2]
+          <div className="p-2.5 space-y-2 text-[11px]">
+            <label className="flex items-center justify-between text-[#87949A] hover:text-[#E5ECF0] cursor-pointer">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#48D8D0]" />
+                Victim Beacon
               </span>
               <input
                 type="checkbox"
                 checked={showVictimMarker}
                 onChange={(e) => setShowVictimMarker(e.target.checked)}
-                className="accent-accent-cyan rounded"
+                className="accent-[#48D8D0] rounded cursor-pointer"
               />
             </label>
 
-            <label className="flex items-center justify-between text-tactext-secondary hover:text-tactext-primary cursor-pointer">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-0.5 bg-accent-teal" />
-                Movement Trail ({gpsTrail.length} pts)
+            <label className="flex items-center justify-between text-[#87949A] hover:text-[#E5ECF0] cursor-pointer">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-0.5 bg-[#19A88F]" />
+                Movement Trail
               </span>
               <input
                 type="checkbox"
                 checked={showTrail}
                 onChange={(e) => setShowTrail(e.target.checked)}
-                className="accent-accent-cyan rounded"
+                className="accent-[#48D8D0] rounded cursor-pointer"
               />
             </label>
 
-            <label className="flex items-center justify-between text-tactext-secondary hover:text-tactext-primary cursor-pointer">
-              <span className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full border border-accent-teal" />
-                Accuracy Radius (HDOP)
+            <label className="flex items-center justify-between text-[#87949A] hover:text-[#E5ECF0] cursor-pointer">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full border border-[#19A88F]" />
+                Accuracy Radius
               </span>
               <input
                 type="checkbox"
                 checked={showAccuracy}
                 onChange={(e) => setShowAccuracy(e.target.checked)}
-                className="accent-accent-cyan rounded"
+                className="accent-[#48D8D0] rounded cursor-pointer"
               />
             </label>
 
-            <div className="pt-2 border-t border-border-subtle flex items-center justify-between text-3xs text-tactext-muted">
-              <span>Trail Points: <strong>{gpsTrail.length}</strong></span>
+            <div className="pt-2 border-t border-[#26343A] flex items-center justify-between text-[10px] text-[#58666B]">
+              <span>Trail Points: <strong className="text-[#9CB3C9]">{gpsTrail.length}</strong></span>
               {gpsTrail.length > 0 && (
                 <button
                   onClick={() => clearLocalHistory()}
-                  className="hover:text-status-critical flex items-center gap-1 transition-colors"
+                  className="hover:text-[#F06464] flex items-center gap-1 transition-colors"
+                  title="Purge trail from map"
                 >
-                  <RotateCcw className="w-2.5 h-2.5" /> Clear Trail
+                  <RotateCcw className="w-2.5 h-2.5" /> Clear
                 </button>
               )}
             </div>
@@ -266,73 +287,18 @@ export const MapWorkspace: React.FC = () => {
         )}
       </div>
 
-      {/* Floating Active Target Coordinates HUD (Top-Center) */}
-      {latestGps && (
-        <div className="absolute top-4 left-72 right-72 mx-auto max-w-xl z-[400] bg-bg-panel/95 border border-border-subtle rounded px-4 py-2 flex items-center justify-between backdrop-blur-md shadow-2xl font-mono text-xs select-none">
-          <div className="flex items-center gap-3">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                isLive ? 'bg-status-success animate-pulse' : 'bg-status-warning'
-              }`}
-            />
-            <div>
-              <div className="text-3xs text-tactext-secondary uppercase">
-                {isLive ? 'LIVE FIX' : `LAST KNOWN LOCATION (${fixAgeSec}s ago)`}
-              </div>
-              <div className="text-xs font-bold text-tactext-primary">
-                {latestGps.latitude.toFixed(6)}° N, {latestGps.longitude.toFixed(6)}° E
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 text-3xs text-tactext-secondary border-l border-border-subtle pl-4">
-            <div>
-              <span>ALT:</span> <strong className="text-tactext-primary">{latestGps.altitude_m}m</strong>
-            </div>
-            <div>
-              <span>SPD:</span> <strong className="text-tactext-primary">{latestGps.speed_kmh.toFixed(1)} km/h</strong>
-            </div>
-            <div>
-              <span>SATS:</span> <strong className="text-accent-teal">{latestGps.satellites}</strong>
-            </div>
-          </div>
-
-          {latestGps.google_maps_url && (
-            <a
-              href={latestGps.google_maps_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-2 py-1 bg-bg-panel-raised hover:bg-border-subtle text-accent-cyan border border-border-active/40 rounded text-3xs flex items-center gap-1 transition-colors"
-            >
-              Maps <ExternalLink className="w-2.5 h-2.5" />
-            </a>
-          )}
-        </div>
-      )}
-
-      {/* No GPS Fix Floating Warning if absent */}
-      {!latestGps && (
-        <div className="absolute top-4 left-72 right-72 mx-auto max-w-md z-[400] bg-bg-panel/95 border border-status-warning/40 rounded px-4 py-2.5 flex items-center gap-3 backdrop-blur-md shadow-2xl font-mono text-xs">
-          <span className="w-2 h-2 rounded-full bg-status-warning animate-pulse" />
-          <div className="leading-tight">
-            <div className="text-2xs font-bold text-status-warning uppercase">NO VALID GPS FIX ACQUIRED</div>
-            <div className="text-3xs text-tactext-muted mt-0.5">Awaiting 0xA2 telemetry packet from victim transmitter</div>
-          </div>
-        </div>
-      )}
-
-      {/* Floating Map Controls (Bottom Left, inspired by Overglass MAP/SAT/2D/3D switcher) */}
-      <div className="absolute bottom-4 left-4 z-[400] flex items-center gap-2 font-mono text-2xs select-none">
+      {/* Floating Map Controls (Bottom Left, Overglass Segmented Switcher) */}
+      <div className="absolute bottom-3 left-3 z-20 flex items-center gap-1.5 font-mono text-[10px] select-none">
         {/* Style Switcher */}
-        <div className="bg-bg-panel/95 border border-border-subtle rounded p-0.5 flex items-center gap-0.5 backdrop-blur-md shadow-lg">
+        <div className="bg-[#0E151A]/95 border border-[#26343A] rounded p-0.5 flex items-center gap-0.5 backdrop-blur-md shadow-lg">
           {(['dark', 'sat', 'street'] as const).map((style) => (
             <button
               key={style}
               onClick={() => setMapStyle(style)}
-              className={`px-2 py-1 rounded uppercase tracking-wider font-bold transition-colors ${
+              className={`px-2 py-0.5 rounded uppercase tracking-wider font-bold transition-colors ${
                 mapStyle === style
-                  ? 'bg-border-active/30 text-accent-cyan border border-border-active'
-                  : 'text-tactext-muted hover:text-tactext-secondary'
+                  ? 'bg-[#48D8D0]/20 text-[#48D8D0] border border-[#48D8D0]/40'
+                  : 'text-[#87949A] hover:text-[#E5ECF0]'
               }`}
             >
               {style === 'dark' ? 'DARK' : style === 'sat' ? 'SAT' : 'MAP'}
@@ -340,21 +306,38 @@ export const MapWorkspace: React.FC = () => {
           ))}
         </div>
 
-        {/* Tactical Recenter & Fit Buttons */}
-        <div className="bg-bg-panel/95 border border-border-subtle rounded p-0.5 flex items-center gap-0.5 backdrop-blur-md shadow-lg">
+        {/* Tactical Actions (Zoom & Recenter) */}
+        <div className="bg-[#0E151A]/95 border border-[#26343A] rounded p-0.5 flex items-center gap-0.5 backdrop-blur-md shadow-lg">
           <button
-            onClick={recenterOnVictim}
-            className="p-1 rounded text-tactext-secondary hover:text-accent-cyan hover:bg-bg-panel-raised transition-colors"
-            title="Center map on victim beacon"
+            onClick={handleZoomIn}
+            className="p-1 rounded hover:bg-[#151D23] text-[#87949A] hover:text-[#48D8D0] transition-colors"
+            title="Zoom In"
           >
-            <Crosshair className="w-3.5 h-3.5" />
+            <Plus className="w-3 h-3" />
           </button>
           <button
-            onClick={fitToTrail}
-            className="p-1 rounded text-tactext-secondary hover:text-accent-cyan hover:bg-bg-panel-raised transition-colors"
-            title="Fit view to movement trail"
+            onClick={handleZoomOut}
+            className="p-1 rounded hover:bg-[#151D23] text-[#87949A] hover:text-[#48D8D0] transition-colors"
+            title="Zoom Out"
           >
-            <Maximize2 className="w-3.5 h-3.5" />
+            <Minus className="w-3 h-3" />
+          </button>
+          <div className="w-[1px] h-3 bg-[#26343A] my-auto" />
+          <button
+            onClick={handleRecenter}
+            disabled={!latestGps}
+            className="p-1 rounded hover:bg-[#151D23] text-[#87949A] hover:text-[#48D8D0] disabled:opacity-40 transition-colors"
+            title="Recenter On Target Beacon"
+          >
+            <Crosshair className="w-3 h-3" />
+          </button>
+          <button
+            onClick={handleFitTrail}
+            disabled={gpsTrail.length === 0}
+            className="p-1 rounded hover:bg-[#151D23] text-[#87949A] hover:text-[#48D8D0] disabled:opacity-40 transition-colors"
+            title="Fit Entire Trail in View"
+          >
+            <Maximize2 className="w-3 h-3" />
           </button>
         </div>
       </div>

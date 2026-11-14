@@ -97,10 +97,10 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-      <div className="w-full max-w-4xl h-[640px] bg-[#0E151A] border border-[#26343A] rounded-lg shadow-2xl flex flex-col font-mono text-xs overflow-hidden hud-panel relative">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fadeIn">
+      <div className="w-full max-w-4xl h-[88vh] max-h-[600px] bg-[#0C1216] border border-[#26343A] rounded-lg shadow-2xl flex flex-col font-mono text-xs overflow-hidden relative">
         {/* HEADER BAR */}
-        <div className="px-4 py-2.5 bg-[#10161B] border-b border-[#26343A] flex items-center justify-between">
+        <div className="px-4 py-2.5 bg-[#10161B] border-b border-[#26343A] flex items-center justify-between flex-shrink-0">
           <div className="flex items-center space-x-2">
             <Terminal className="w-4 h-4 text-[#48D8D0]" />
             <span className="font-bold text-sm tracking-wide text-[#E5ECF0]">
@@ -113,19 +113,17 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({ onClose }) => {
             </span>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={onClose}
-              className="p-1 rounded text-[#87949A] hover:text-[#E5ECF0] hover:bg-[#202B33] transition-colors"
-              title="Close Console (ESC)"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded text-[#87949A] hover:text-[#E5ECF0] hover:bg-[#202B33] transition-colors"
+            title="Close Console (ESC)"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         {/* TOOLBAR */}
-        <div className="px-4 py-2 bg-[#0B1015] border-b border-[#26343A] flex flex-wrap items-center justify-between gap-2">
+        <div className="px-4 py-2 bg-[#080B0F] border-b border-[#26343A] flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
           {/* Filter Pills */}
           <div className="flex items-center space-x-1">
             {['ALL', 'GPS', 'PLAYBACK', 'RX STATUS', 'WARN', 'UNKNOWN'].map((f) => (
@@ -152,7 +150,7 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({ onClose }) => {
                 placeholder="Filter output..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-7 pr-2 py-1 bg-[#10161B] border border-[#26343A] rounded text-[11px] text-[#E5ECF0] focus:border-[#48D8D0] focus:outline-none w-36 sm:w-48 placeholder-[#58666B]"
+                className="pl-7 pr-2 py-1 bg-[#10161B] border border-[#26343A] rounded text-[11px] text-[#E5ECF0] focus:border-[#48D8D0] focus:outline-none w-32 sm:w-44 placeholder-[#58666B]"
               />
             </div>
 
@@ -190,7 +188,7 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({ onClose }) => {
         </div>
 
         {/* LOG DISPLAY VIEWPORT */}
-        <div className="flex-1 p-3 overflow-y-auto bg-[#070A0D] text-[11px] leading-relaxed custom-scrollbar font-mono select-text">
+        <div className="flex-1 p-3 overflow-y-auto bg-[#070A0D] text-[11px] leading-relaxed custom-scrollbar font-mono select-text min-h-0">
           {filteredLogs.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-[#58666B] space-y-2">
               <Terminal className="w-8 h-8 opacity-40 text-[#48D8D0]" />
@@ -237,7 +235,7 @@ export const TerminalDrawer: React.FC<TerminalDrawerProps> = ({ onClose }) => {
         </div>
 
         {/* FOOTER */}
-        <div className="px-4 py-1.5 bg-[#0B1015] border-t border-[#26343A] flex items-center justify-between text-[10px] text-[#58666B]">
+        <div className="px-4 py-1.5 bg-[#0B1015] border-t border-[#26343A] flex items-center justify-between text-[10px] text-[#58666B] flex-shrink-0">
           <span>
             SHOWING {filteredLogs.length} OF {rawLogs.length} LOGGED RECORDS
           </span>
