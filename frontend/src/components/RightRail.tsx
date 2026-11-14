@@ -14,6 +14,8 @@ import {
   Check,
   ExternalLink,
   Zap,
+  Play,
+  HelpCircle,
 } from 'lucide-react';
 import { useResQ } from '../context/ResQContext';
 import { audioMonitor } from '../services/audioMonitor';
@@ -31,6 +33,7 @@ export const RightRail: React.FC = () => {
   const [isMonitoring, setIsMonitoring] = useState<boolean>(audioMonitor.getIsMonitoring());
   const [isMicActive, setIsMicActive] = useState<boolean>(audioMonitor.getIsMicActive());
   const [volume, setVolume] = useState<number>(audioMonitor.getVolume());
+  const [showHissHelp, setShowHissHelp] = useState<boolean>(false);
 
   // Fix Freshness Evaluation
   const isFixLive = latestGps && Date.now() / 1000 - latestGps.timestamp < 30;
@@ -69,6 +72,10 @@ export const RightRail: React.FC = () => {
     const v = parseFloat(e.target.value);
     setVolume(v);
     audioMonitor.setVolume(v);
+  };
+
+  const handleTestVoice = () => {
+    audioMonitor.playVoiceTestSample();
   };
 
   // Voice loss indicator
@@ -244,7 +251,7 @@ export const RightRail: React.FC = () => {
           </div>
 
           <span className="px-1.5 py-0.2 rounded bg-[#080B0F] border border-[#26343A] text-[#19A88F] text-[9px] font-bold">
-            1600 BPS
+            CODEC2 1600
           </span>
         </div>
 
@@ -260,7 +267,7 @@ export const RightRail: React.FC = () => {
           {isMonitoring ? (
             <>
               <Volume2 className="w-3.5 h-3.5 text-[#35C98A] animate-pulse" />
-              <span>LIVE PC AUDIO MONITOR ACTIVE</span>
+              <span>PC AUDIO MONITOR ACTIVE (NO HISS)</span>
             </>
           ) : (
             <>
@@ -270,10 +277,10 @@ export const RightRail: React.FC = () => {
           )}
         </button>
 
-        {/* Volume Slider & Line-In Mic Toggle */}
+        {/* Volume Slider & Action Buttons */}
         <div className="bg-[#080B0F] border border-[#26343A] p-2 rounded space-y-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center space-x-1.5 flex-1">
+          <div className="flex items-center justify-between gap-1.5">
+            <div className="flex items-center space-x-1 flex-1">
               <span className="text-[8px] text-[#58666B]">VOL:</span>
               <input
                 type="range"
@@ -289,6 +296,17 @@ export const RightRail: React.FC = () => {
               </span>
             </div>
 
+            {/* Test Voice Button */}
+            <button
+              onClick={handleTestVoice}
+              className="px-1.5 py-0.5 rounded border text-[8px] font-semibold transition-colors flex items-center space-x-1 bg-[#151D23] text-[#48D8D0] border-[#26343A] hover:border-[#48D8D0]/50"
+              title="Test browser speech voice output"
+            >
+              <Play className="w-2.5 h-2.5" />
+              <span>TEST VOICE</span>
+            </button>
+
+            {/* Line-In Mic Toggle */}
             <button
               onClick={handleToggleMic}
               className={`px-1.5 py-0.5 rounded border text-[8px] font-semibold transition-colors flex items-center space-x-1 shrink-0 ${
@@ -299,7 +317,7 @@ export const RightRail: React.FC = () => {
               title="Listen to physical ESP32 speaker via PC 3.5mm Line-In or Mic"
             >
               <Mic className="w-2.5 h-2.5" />
-              <span>{isMicActive ? 'LINE-IN ON' : 'LINE-IN MIC'}</span>
+              <span>{isMicActive ? 'LINE-IN ON' : 'LINE-IN'}</span>
             </button>
           </div>
 
@@ -344,12 +362,32 @@ export const RightRail: React.FC = () => {
         </div>
 
         {/* Hardware Architecture Disclosure Notice */}
-        <div className="p-1.5 rounded bg-[#080B0F] border border-[#19A88F]/30 text-[#87949A] text-[9px] leading-relaxed flex items-start space-x-1.5">
-          <Zap className="w-3 h-3 text-[#19A88F] flex-shrink-0 mt-0.5" />
-          <div>
-            <span className="text-[#19A88F] font-semibold">MAX98357A HW Speaker: </span>
-            Voice is synthesized directly on the ESP32 to its physical speaker (GPIO 25/26/27). Enable the PC Monitor button above to hear audio through laptop speakers.
+        <div className="p-1.5 rounded bg-[#080B0F] border border-[#19A88F]/30 text-[#87949A] text-[9px] leading-relaxed">
+          <div className="flex items-center justify-between text-[#19A88F] font-semibold mb-0.5">
+            <span className="flex items-center space-x-1">
+              <Zap className="w-3 h-3 text-[#19A88F]" />
+              <span>MAX98357A HW SPEAKER</span>
+            </span>
+            <button
+              onClick={() => setShowHissHelp(!showHissHelp)}
+              className="text-[#87949A] hover:text-[#E5ECF0] flex items-center space-x-0.5 text-[8px]"
+            >
+              <HelpCircle className="w-2.5 h-2.5" />
+              <span>{showHissHelp ? 'HIDE' : 'HISS GUIDE'}</span>
+            </button>
           </div>
+          <div>
+            Voice is synthesized directly on ESP32 to its physical speaker (GPIO 25/26/27).
+          </div>
+
+          {showHissHelp && (
+            <div className="mt-1.5 pt-1.5 border-t border-[#1C262C] space-y-1 text-[8px] text-[#87949A]">
+              <div className="text-[#E6B84D] font-bold">WHY HARDWARE EMITS HISS:</div>
+              <div>• <strong>INMP441 Mic L/R Pin:</strong> On TX, pin L/R MUST be wired to GND. If left floating, the mic sends clock noise that decodes as continuous whispering hiss.</div>
+              <div>• <strong>MAX98357A SD Pin:</strong> On RX, pin SD must connect to GPIO 13. If floating, the amp never mutes between voice bursts.</div>
+              <div>• <strong>Speak Close to Mic:</strong> Speak within 3-5 cm of the INMP441 hole to overcome background ambient levels.</div>
+            </div>
+          )}
         </div>
       </div>
 
