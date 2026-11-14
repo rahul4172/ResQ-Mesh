@@ -369,6 +369,92 @@ Queue waiting: 3
 
 ---
 
+## Live Rescue Monitoring Dashboard (Local-First)
+
+The repository includes a dedicated, mission-grade emergency response command center dashboard designed for field search-and-rescue (SAR) operators. The dashboard connects locally to the ESP32 receiver over USB Serial without requiring internet or cloud infrastructure.
+
+```
++-----------------------------------------------------------------------------------------+
+|                                    RESQ-MESH DASHBOARD                                  |
+|                                                                                         |
+|  [ESP32 Receiver] ---> (USB Serial @ 115200) ---> [FastAPI / PySerial Bridge]           |
+|                                                          |                              |
+|                                          +---------------+---------------+              |
+|                                          |                               |              |
+|                                    (WebSockets)                     (SQLite DB)         |
+|                                          |                               |              |
+|                                          v                               v              |
+|                             [React + Vite Frontend] <-------- [Historical Replay]       |
+|                             (Leaflet / OpenStreetMap)                                   |
++-----------------------------------------------------------------------------------------+
+```
+
+### Dashboard Architecture & Stack
+
+- **Frontend**: React 18, Vite 5, TypeScript, Tailwind CSS, Leaflet + OpenStreetMap, Lucide Icons.
+- **Backend Bridge**: Python 3.10+, FastAPI, PySerial, WebSockets, Pydantic v2.
+- **Local Persistence**: Thread-safe SQLite database (`backend/data/resq_mesh.db`) recording GPS trajectories, packet loss history, and raw serial logs.
+- **Design System**: Premium emergency response command-center dark mode (charcoal/navy palette `#070a12` / `#0b0f19`, restrained cyan `#06b6d4`, emerald, amber, and rose status accents).
+
+### Quickstart & Installation
+
+#### 1. Backend Setup
+
+```bash
+# Navigate to the backend directory
+cd backend
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the backend server (starts on http://127.0.0.1:8000)
+python run.py
+```
+
+#### 2. Frontend Setup (Development Mode)
+
+```bash
+# In a new terminal, navigate to the frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start the Vite development server (starts on http://localhost:5173)
+npm run dev
+```
+
+> [!TIP]
+> The backend automatically serves the production frontend build. You can build the frontend with `npm run build` inside `frontend/`, and then run only `python backend/run.py` to access the full application directly at `http://localhost:8000/`.
+
+### Operating Modes & COM Port Configuration
+
+- **Hardware Mode**: Connect the ESP32 receiver via USB. Open the **Settings** tab in the dashboard, click the **Refresh** button, select the assigned COM port (e.g. `COM3` on Windows or `/dev/ttyUSB0` on Linux), confirm the baud rate is set to **115200**, and click **Connect Receiver**.
+- **Offline Simulation Mode**: If an ESP32 receiver is not physically attached, click **Start Offline Simulation** in the navigation bar or Settings page. The simulator emits verified protocol strings matching the immutable receiver firmware, generating realistic SAR search-grid movements and voice stream events for test and evaluation. All simulated telemetry is clearly labeled with `[SIMULATED]` badges.
+
+### Audio Protocol & Physical Speaker Notice
+
+> [!NOTE]
+> In accordance with the immutable firmware protocol documented in [RX_SERIAL_PROTOCOL.md](file:///c:/Users/rahul/Desktop/ResQ-Mesh/RX_SERIAL_PROTOCOL.md), raw PCM audio samples and Codec2 bitstream frames are **not transmitted across USB Serial**. The receiver's dual-core FreeRTOS pipeline routes audio directly over I2S to the on-board **MAX98357A Class-D DAC and 3W speaker**. The dashboard displays real-time speech activity, peak VU amplitude meters, Codec2 decode latency, and jitter buffer health, while providing an in-browser audio test fixture for operator verification.
+
+### Test Procedures
+
+Run the automated backend test suite:
+
+```bash
+# Run verified parser and API unit tests
+python -m pytest backend/tests -v
+```
+
+Run frontend typecheck and production build:
+
+```bash
+cd frontend
+npm run build
+```
+
+---
+
 ## Troubleshooting
 
 | Symptom | Probable Cause | Corrective Action |

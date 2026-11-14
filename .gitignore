@@ -7,6 +7,29 @@
 *.d
 *.map
 
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+.coverage
+htmlcov/
+
+# Local databases and logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+backend/data/*.db
+backend/logs/*.log
+
+# Node & Frontend dependencies and builds
+node_modules/
+frontend/node_modules/
+frontend/dist/
+dist/
+.npm/
+
 # Editor and IDE directories
 .vscode/
 .idea/
