@@ -1,48 +1,48 @@
 import React, { useState } from 'react';
 import { ResQProvider } from './context/ResQContext';
-import { Sidebar } from './components/Layout/Sidebar';
-import { Navbar } from './components/Layout/Navbar';
-import { OverviewPage } from './pages/OverviewPage';
-import { LiveTrackingPage } from './pages/LiveTrackingPage';
-import { VoiceMonitorPage } from './pages/VoiceMonitorPage';
-import { PacketLogsPage } from './pages/PacketLogsPage';
-import { DiagnosticsPage } from './pages/DiagnosticsPage';
-import { SettingsPage } from './pages/SettingsPage';
+import { TopHeader } from './components/TopHeader';
+import { LeftRail } from './components/LeftRail';
+import { MapWorkspace } from './components/MapWorkspace';
+import { RightRail } from './components/RightRail';
+import { BottomStatusBar } from './components/BottomStatusBar';
+import { TerminalDrawer } from './components/TerminalDrawer';
+import { SettingsDrawer } from './components/SettingsDrawer';
 
 export const AppContent: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>('overview');
-
-  const renderActivePage = () => {
-    switch (activeTab) {
-      case 'overview':
-        return <OverviewPage onNavigate={setActiveTab} />;
-      case 'tracking':
-        return <LiveTrackingPage />;
-      case 'voice':
-        return <VoiceMonitorPage />;
-      case 'packets':
-        return <PacketLogsPage />;
-      case 'diagnostics':
-        return <DiagnosticsPage />;
-      case 'settings':
-        return <SettingsPage />;
-      default:
-        return <OverviewPage onNavigate={setActiveTab} />;
-    }
-  };
+  const [showTerminal, setShowTerminal] = useState<boolean>(false);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
 
   return (
-    <div className="flex bg-charcoal-950 min-h-screen text-slate-100 font-sans">
-      {/* Fixed Left Tactical Sidebar */}
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+    <div className="flex flex-col h-screen w-screen bg-[#080B0F] text-[#9CB3C9] select-none overflow-hidden font-sans">
+      {/* 1. TOP HEADER & VERIFIED ALERT TICKER */}
+      <TopHeader
+        onOpenTerminal={() => setShowTerminal(true)}
+        onOpenSettings={() => setShowSettings(true)}
+      />
 
-      {/* Main Content Area */}
-      <div className="flex-1 ml-64 flex flex-col min-h-screen">
-        <Navbar />
-        <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
-          {renderActivePage()}
+      {/* 2. THREE-COLUMN OPERATIONAL WORKSPACE */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Persistent Left Rail: Connection, Intercept Feed, Voice Activity */}
+        <LeftRail />
+
+        {/* Dominant Central Map Workspace */}
+        <main className="flex-1 h-full relative overflow-hidden">
+          <MapWorkspace />
         </main>
+
+        {/* Persistent Right Rail: Victim HUD, GPS Grid, Audio Decoupling, Packets, Health */}
+        <RightRail />
       </div>
+
+      {/* 3. BOTTOM STATUS STRIP */}
+      <BottomStatusBar
+        onOpenTerminal={() => setShowTerminal(true)}
+        onOpenSettings={() => setShowSettings(true)}
+      />
+
+      {/* 4. FLOATING DRAWERS */}
+      {showTerminal && <TerminalDrawer onClose={() => setShowTerminal(false)} />}
+      {showSettings && <SettingsDrawer onClose={() => setShowSettings(false)} />}
     </div>
   );
 };
